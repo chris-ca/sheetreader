@@ -1,23 +1,59 @@
 #!/usr/bin/env python3
-import os, sys
-import gspread
+from abc import ABC, abstractproperty
 from datetime import datetime
 from diskcache import Cache
+import logging
+import gspread
 import config
 
 cache = Cache(config.cache["path"])
 
+logger = logging.getLogger(__name__)
 
 class NoEntryException(Exception):
     pass
 
 
-class Logbook:
+class Logbook(ABC):
+    """Abstract class for Logbook"""
+
+    @staticmethod
+    def load(type_: str, **kwargs):
+        """Return Logbook object
+
+        Args:
+            type_ (str): "Google"
+            **kwargs (dict): Keyword arguments
+                used to instantiate child class
+        Returns:
+            Logbook
+        """
+        class_ = type_ + "Logbook"
+        class_ = globals()[class_]
+        obj = class_(**kwargs)
+        return obj
+
+    @abstractproperty
+    def entries(self):
+        pass
+
+
+class GoogleLogbook(Logbook):
+    """Read Logbook from Google Sheets"""
+
     auth_file = "service.json"
     _entries = {}
     heading = []
 
     def __init__(self, **kwargs):
+        """Instantiate class.
+        Args:
+            **kwargs : Dictionary with Configuration
+                ``{
+                    "key"       : "GOOGLE-SHEETS-ID_STRING",
+                    "auth_file" : "service.json"
+                }``
+        """
         self.key = kwargs.get("key", None)
         self.file = kwargs.get("file", None)
         self.auth_file = kwargs.get("auth_file", None)
@@ -29,15 +65,17 @@ class Logbook:
                 self.heading = [e.replace(" ", "_") for e in entry]
             else:
                 try:
-                    entry = LogbookEntry(entry, self.heading)
+                    entry = Entry(entry, self.heading)
                     if entry.is_valid_entry:
                         self._entries[entry.iso_date] = entry
 
-                except:
-                    print("Skipped invalid: " + entry)
+                except (KeyError, ValueError):
+                    logger.warning("Skipped invalid entry %d", i)
+        logger.debug("Total entries checked: %d", i)
 
     @cache.memoize(expire=config.cache["duration"])
     def fetch_entries(self):
+        logger.info("Loading Google Sheet %s using credentials from %s", self.key, self.auth_file)
         gc = gspread.service_account(filename=self.auth_file)
         sheet = gc.open_by_key(self.key)
         ws = sheet.worksheet("entries")
@@ -51,13 +89,13 @@ class Logbook:
     def entry(self, iso_date):
         try:
             return self._entries[iso_date]
-        except KeyError:
-            raise NoEntryException("No logbook entry for " + iso_date)
+        except KeyError as exc:
+            msg = ("No logbook entry for %s", iso_date)
+            logger.warning(msg)
+            raise NoEntryException(msg) from exc
 
 
-class LogbookEntry:
-    time = 0
-
+class Entry:
     def __repr__(self):
         return (
             "Logbook:"
@@ -72,7 +110,7 @@ class LogbookEntry:
         )
 
     def __init__(self, entry, keys):
-        """assign all keys as they come from the spreadsheet"""
+        """Assign instance variables as they come at at runtime."""
         for i, k in enumerate(keys):
             setattr(self, k.replace(" ", "_"), entry[i])
 
@@ -100,8 +138,7 @@ class LogbookEntry:
     def is_past_day(self):
         if self.datetime <= datetime.today():
             return True
-        else:
-            return False
+        return False
 
     @property
     def is_cycling_day(self):
@@ -113,9 +150,10 @@ class LogbookEntry:
 
 
 class MarkdownDecorator:
+    """Turn Logbook Entry into Markdown."""
     markdown = ""
 
-    def __init__(self, l: LogbookEntry):
+    def __init__(self, l: Entry):
         self.entry = l
 
     def __repr__(self):

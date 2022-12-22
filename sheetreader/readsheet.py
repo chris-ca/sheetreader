@@ -1,31 +1,18 @@
 #!/usr/bin/env python3
-#####################################################################################################################
-# Script Name     : .py
-# Description     :
-#
-#
-#
-# Requires        :
-# Arguments       :
-# Run Information : This script is run manually|via crontab.
-# Author          : Chris, 2020
-# Output          :
-#####################################################################################################################
-# define the scope
+""" read logbook entries and display as markdown """
+import logging
+from sheetreader.Logbook import Logbook, MarkdownDecorator
 
-from Sheet import *
-import config
+logger = logging.getLogger(__name__)
+ch = logging.StreamHandler()
+formatter = logging.Formatter("%(levelname)s - %(module)s - %(message)s")
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+logging.basicConfig(level=logging.INFO)
 
+config = __import__("config-test")
 
-# root = '/home/cw/Sync/z4ty4-ikud8'
-#
-# i = 0
-# for f in walk_diary_filesystem(root):
-#     i+=1
-#     print(f.isodate())
-# print(f"{i} matching files found")
-
-logbook = Logbook(**config.logbook)
+logbook = Logbook.load('Google', **config.logbook)
 
 for i, e in enumerate(logbook.entries):
     print(i, MarkdownDecorator(e))

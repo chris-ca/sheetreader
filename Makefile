@@ -5,7 +5,7 @@ format:
 	black sheetreader/*.py
 
 lint:
-	pylint --disable=R,C ./sheetreader
+	pylint --disable=no-member,invalid-name ./sheetreader
 
 test:
 	python -m pytest -v tests/

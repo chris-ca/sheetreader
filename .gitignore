@@ -1,1 +1,4 @@
 .cache
+config-test.py
+config.py
+service.json
