@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "sheetreader"
+version = "0.1.0"
+description = ""
+authors = ["Chris Weyland <github@nextmail.cc>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+gspread = "^5.7.2"
+diskcache = "^5.4.0"
+pytest = "^7.2.0"
+black = "^22.12.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
