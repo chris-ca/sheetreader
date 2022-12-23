@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """ read logbook entries and display as markdown """
 import logging
+import config
 from sheetreader.Logbook import Logbook, MarkdownDecorator
 
 logger = logging.getLogger(__name__)
@@ -10,9 +11,8 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 logging.basicConfig(level=logging.INFO)
 
-config = __import__("config-test")
 
-logbook = Logbook.load('Google', **config.logbook)
+logbook = Logbook.load("Google", **config.logbook)
 
 for i, e in enumerate(logbook.entries):
-    print(i, MarkdownDecorator(e))
+    print(MarkdownDecorator(e).get_markdown())

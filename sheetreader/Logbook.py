@@ -4,11 +4,13 @@ from datetime import datetime
 from diskcache import Cache
 import logging
 import gspread
+import jinja2
 import config
 
 cache = Cache(config.cache["path"])
 
 logger = logging.getLogger(__name__)
+
 
 class NoEntryException(Exception):
     pass
@@ -42,8 +44,6 @@ class GoogleLogbook(Logbook):
     """Read Logbook from Google Sheets"""
 
     auth_file = "service.json"
-    _entries = {}
-    heading = []
 
     def __init__(self, **kwargs):
         """Instantiate class.
@@ -58,27 +58,43 @@ class GoogleLogbook(Logbook):
         self.file = kwargs.get("file", None)
         self.auth_file = kwargs.get("auth_file", None)
 
-        entries = self.fetch_entries()
+        rows = self.fetch_sheet("entries")
 
-        for i, entry in enumerate(entries):
+        self._entries = {}
+        for i, row in enumerate(rows):
             if i == 0:
-                self.heading = [e.replace(" ", "_") for e in entry]
+                self.set_header(row)
             else:
                 try:
-                    entry = Entry(entry, self.heading)
+                    entry = Entry(row, self.header)
                     if entry.is_valid_entry:
                         self._entries[entry.iso_date] = entry
 
-                except (KeyError, ValueError):
+                except (KeyError, ValueError) as exc:
                     logger.warning("Skipped invalid entry %d", i)
-        logger.debug("Total entries checked: %d", i)
+                    raise Exception from exc
+        logger.debug(
+            "Total entries checked: %d", i
+        )  # pylint: disable=undefined-loop-variable
 
-    @cache.memoize(expire=config.cache["duration"])
-    def fetch_entries(self):
-        logger.info("Loading Google Sheet %s using credentials from %s", self.key, self.auth_file)
+    def set_header(self, row):
+        """Return cleaned header fields"""
+        self.header = [f.replace(" ", "_") for f in row]
+
+    def load_sheet(self):
+        logger.info(
+            "Loading Google Sheet %s using credentials from %s",
+            self.key,
+            self.auth_file,
+        )
         gc = gspread.service_account(filename=self.auth_file)
-        sheet = gc.open_by_key(self.key)
-        ws = sheet.worksheet("entries")
+        return gc.open_by_key(self.key)
+
+    @cache.memoize(expire=config.cache["cache_time_gsheets"])
+    def fetch_sheet(self, key):
+        """Return all rows fields for the given worksheet"""
+        sheet = self.load_sheet()
+        ws = sheet.worksheet(key)
         return ws.get_all_values()
 
     @property
@@ -87,6 +103,13 @@ class GoogleLogbook(Logbook):
             yield self._entries[day]
 
     def entry(self, iso_date):
+        """Return entry for date.
+
+        Args:
+            iso_date str: Date of entry to return, e.g. 2018-06-18
+        Returns:
+            Entry:
+        """
         try:
             return self._entries[iso_date]
         except KeyError as exc:
@@ -110,7 +133,16 @@ class Entry:
         )
 
     def __init__(self, entry, keys):
-        """Assign instance variables as they come at at runtime."""
+        """Assign instance variables as they come at at runtime.
+
+        The following fields are used::
+
+            no, day, start, end, country, timezone, place, placeDetail,
+            time, distance, elevation, descent, altitude, flats, weather,
+            food_cost, other, accommodation, fx, overnight, summary, lostItems,
+            internal_notes, cost_p_day, total_time, km_cumulative,
+            average_speed, break_time
+        """
         for i, k in enumerate(keys):
             setattr(self, k.replace(" ", "_"), entry[i])
 
@@ -121,14 +153,31 @@ class Entry:
         self.day = int(self.iso_date.split("-")[2])
 
         self.datetime = datetime(self.year, self.month, self.day)
-        try:
-            self.distance = float(self.distance)
-        except ValueError:
-            self.distance = None
-        try:
-            self.average_speed = float(self.average_speed)
-        except ValueError:
-            self.average_speed = None
+
+        self.set_none_if_empty()
+        self.convert_costs_to_float()
+
+    def set_none_if_empty(self):
+        # Distance is usually set to '0' for rest days
+        # Other fields can also be empty
+        for k in ["distance", "elevation", "descent", "altitude", "average_speed"]:
+            try:
+                # remove , that comes from gogole sheet
+                v = getattr(self, k)
+                v = float(v.replace(",", ""))
+                if v == 0:
+                    raise ValueError
+            except ValueError:
+                v = None
+
+            setattr(self, k, v)
+
+    def convert_costs_to_float(self):
+        for k in ["food_cost", "accommodation", "other", "cost_p_day"]:
+            try:
+                setattr(self, k, float(getattr(self, k).removesuffix(" €")))
+            except ValueError:
+                setattr(self, k, 0)
 
     @property
     def is_valid_entry(self):
@@ -142,98 +191,28 @@ class Entry:
 
     @property
     def is_cycling_day(self):
-        return self.distance > 0
+        return self.distance is not None
 
     @property
     def is_rest_day(self):
-        return self.distance == 0
+        return self.distance is None
 
 
 class MarkdownDecorator:
     """Turn Logbook Entry into Markdown."""
-    markdown = ""
 
-    def __init__(self, l: Entry):
-        self.entry = l
+    def __init__(self, entry: Entry, template_file="entry_v2.md"):
+        templateLoader = jinja2.FileSystemLoader(searchpath="./templates")
+        templateEnv = jinja2.Environment(loader=templateLoader)
+        self.template = templateEnv.get_template(template_file)
+        self.entry = entry
 
     def __repr__(self):
         return self.get_markdown()
-
-    def add_headline(self, n, s):
-        self.markdown += "\n" + n * "#" + " " + s
-
-    def add_general_stats(self):
-        entry = self.entry
-        self.markdown += f"\n- **Tag**: #{entry.no}"
-
-    def add_distance(self):
-        entry = self.entry
-
-        if entry.time and entry.distance:
-            self.markdown += f"\n- **Unterwegs**: von {entry.start}-{entry.end} Uhr, Fahrzeit: {entry.time} h"
-            self.markdown += (
-                f"\n  - {entry.distance} km (⌀ {entry.average_speed:.{0}f} kph)"
-            )
-            if entry.elevation:
-                self.markdown += f" ({entry.elevation} m up, {entry.descent} m down)"
-            self.markdown += f"\n  - **Gesamt**: {entry.km_cumulative} km"
-        else:
-            # self.markdown +=  "\n- Kein Fahrtag"
-            pass
-
-    def add_place(self):
-        entry = self.entry
-        self.markdown += f"\n- **Ort**: {entry.place} ({entry.country})"
-
-    def add_costs(self):
-        entry = self.entry
-
-        try:
-            food_cost = int(entry.food_cost.removesuffix(" €"))
-        except ValueError:
-            food_cost = 0
-
-        try:
-            accommodation = int(entry.accommodation.removesuffix(" €"))
-        except ValueError:
-            accommodation = 0
-
-        try:
-            other = int(entry.other.removesuffix(" €"))
-        except ValueError:
-            other = 0
-
-        self.markdown += f"\n- **Ausgaben**: {entry.cost_p_day}"
-        if food_cost > 0:
-            self.markdown += f" (Essen {food_cost})"
-        if accommodation > 0:
-            self.markdown += f" (Schlafen {accommodation})"
-        if other > 0:
-            self.markdown += f" (Sonst. {other})"
-
-    def add_place_details(self):
-        entry = self.entry
-        self.markdown += f"\n- **Unterkunft**: {entry.overnight}"
-        if entry.placeDetail != "":
-            self.markdown += f" ({entry.placeDetail})"
-        if entry.altitude != "":
-            self.markdown += f" ({entry.altitude} hm)"
 
     @property
     def text(self):
         return self.get_markdown().lstrip() + "\n"
 
     def get_markdown(self):
-        entry = self.entry
-        self.add_headline(2, "Logbook")
-        self.add_general_stats()
-        self.add_distance()
-        self.add_place()
-        self.add_place_details()
-        self.add_costs()
-        if entry.summary:
-            self.markdown += "\n### Summary\n" + entry.summary
-        if entry.internal_notes:
-            self.markdown += "\n### Notes\n" + entry.internal_notes
-
-        return self.markdown
+        return self.template.render(e=self.entry)
