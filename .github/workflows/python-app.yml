@@ -47,7 +47,7 @@ jobs:
         echo "${{ secrets.ENV_FILE }}" > .env
     - name: 'Google client config file'
       run: |
-        echo "${{ secrets.GOOGLE_SHEETS_CLIENT }}" > service.json
+        echo "${{ secrets.GOOGLE_SHEETS_CLIENT }}" | base64 -d > service.json
 
     - name: Lint with pylint
       run: |
