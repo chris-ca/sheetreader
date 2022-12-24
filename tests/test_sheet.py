@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Test sheet reading"""
-from sheetreader.Logbook import Entry, MarkdownDecorator
+from sheetreader.logbook import Entry, MarkdownDecorator
 
 
 def test_entries_sheet_has_expected_columns(logbook):
