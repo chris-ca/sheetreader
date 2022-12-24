@@ -2,7 +2,7 @@
 """ read logbook entries and display as markdown """
 import logging
 import config
-from sheetreader.Logbook import Logbook, MarkdownDecorator
+from sheetreader.logbook import Logbook, MarkdownDecorator
 
 logger = logging.getLogger(__name__)
 ch = logging.StreamHandler()

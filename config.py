@@ -1,3 +1,4 @@
+"""Load config from environment."""
 import os
 from dotenv import load_dotenv
 

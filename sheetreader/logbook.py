@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-from abc import ABC, abstractproperty
+"""Read Logbook from Google Spreadsheet.
+
+"""
+
+from abc import ABC, abstractmethod
 from datetime import datetime
 from diskcache import Cache
 import logging
@@ -35,7 +39,8 @@ class Logbook(ABC):
         obj = class_(**kwargs)
         return obj
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def entries(self):
         pass
 
@@ -74,7 +79,7 @@ class GoogleLogbook(Logbook):
                     logger.warning("Skipped invalid entry %d", i)
                     raise Exception from exc
         logger.debug(
-            "Total entries checked: %d", i
+            "Total entries checked: %d", len(rows)
         )  # pylint: disable=undefined-loop-variable
 
     def set_header(self, row):
@@ -99,7 +104,7 @@ class GoogleLogbook(Logbook):
 
     @property
     def entries(self):
-        for day in self._entries.keys():
+        for day in self._entries:  # pylint: disable=consider-using-dict-items
             yield self._entries[day]
 
     def entry(self, iso_date):
@@ -119,6 +124,8 @@ class GoogleLogbook(Logbook):
 
 
 class Entry:
+    """Logbook Entry."""
+
     def __repr__(self):
         return (
             "Logbook:"
@@ -146,7 +153,7 @@ class Entry:
         for i, k in enumerate(keys):
             setattr(self, k.replace(" ", "_"), entry[i])
 
-        self.iso_date = self.day
+        self.iso_date = self.day  # pylint: disable=access-member-before-definition
 
         self.year = int(self.iso_date.split("-")[0])
         self.month = int(self.iso_date.split("-")[1])
@@ -202,9 +209,9 @@ class MarkdownDecorator:
     """Turn Logbook Entry into Markdown."""
 
     def __init__(self, entry: Entry, template_file="entry_v2.md"):
-        templateLoader = jinja2.FileSystemLoader(searchpath="./templates")
-        templateEnv = jinja2.Environment(loader=templateLoader)
-        self.template = templateEnv.get_template(template_file)
+        template_loader = jinja2.FileSystemLoader(searchpath="./templates")
+        template_env = jinja2.Environment(loader=template_loader)
+        self.template = template_env.get_template(template_file)
         self.entry = entry
 
     def __repr__(self):

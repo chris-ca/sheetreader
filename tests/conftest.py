@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+"""Global config/fixtures for pytest"""
+
 import pytest
-from sheetreader.Logbook import Logbook
+from sheetreader.logbook import Logbook
 import glob
 import re
 import config
@@ -45,5 +47,7 @@ def mock_yield_markdown():
                     }
                 )
         except AttributeError:
-            breakpoint()
+            # FIXME
+            pass
+
     return result
