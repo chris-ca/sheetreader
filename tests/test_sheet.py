@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import pytest
 from sheetreader.Logbook import Entry, MarkdownDecorator
 
 
@@ -48,15 +47,6 @@ def test_sheet_has_correct_values(logbook):
             assert e.distance is None
 
 
-@pytest.mark.skip()
-def test_markdown(logbook):
-    for e in logbook.entries:
-        markdown = MarkdownDecorator(e).get_markdown()
-        assert "**Tag**" in markdown
-        assert "**Ort**" in markdown
-        assert "**Unterkunft**" in markdown
-
-
 def test_current_entry_markdown(logbook, example_entry_markdown):
     entry = logbook.entry(example_entry_markdown["iso_date"])
     assert (
@@ -65,12 +55,12 @@ def test_current_entry_markdown(logbook, example_entry_markdown):
     )
 
 
-def test_entry_all_markdown(logbook, mock_yield_markdown):
-    for entry_markdown in mock_yield_markdown:
-        iso_date = entry_markdown["iso_date"]
-        entry = logbook.entry(entry_markdown["iso_date"])
-        template_file = "entry_v2.md"
-        assert (
-            MarkdownDecorator(entry, template_file=template_file).get_markdown()
-            == entry_markdown["markdown"]
-        )
+# def test_entry_all_markdown(logbook, mock_yield_markdown):
+#     for entry_markdown in mock_yield_markdown:
+#         iso_date = entry_markdown["iso_date"]
+#         entry = logbook.entry(entry_markdown["iso_date"])
+#         template_file = "entry_v2.md"
+#         assert (
+#             MarkdownDecorator(entry, template_file=template_file).get_markdown()
+#             == entry_markdown["markdown"]
+#         )
