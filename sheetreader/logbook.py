@@ -204,11 +204,13 @@ class Entry:
     def is_rest_day(self):
         return self.distance is None
 
+
 class EntryDecorator(ABC):
     @property
     @abstractmethod
     def content(self):
         pass
+
 
 class MarkdownEntry(EntryDecorator):
     """Turn Logbook Entry into Markdown."""
@@ -228,4 +230,3 @@ class MarkdownEntry(EntryDecorator):
     # @property
     # def text(self):
     #     return self.get().lstrip() + "\n"
-

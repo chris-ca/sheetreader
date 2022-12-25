@@ -44,8 +44,8 @@ def test_entries_sheet_has_expected_columns(logbook):
 # Method is only used to verify the actual Spreadsheet contents
 @pytest.mark.skip()
 def test_sheet_has_correct_values(logbook):
-    non_empty = ['country','place','overnight']
-    non_empty_cycling_day = ['distance','start','end']
+    non_empty = ['country', 'place', 'overnight']
+    non_empty_cycling_day = ['distance', 'start', 'end']
 
     for e in logbook.entries:
         assert isinstance(e, Entry)
