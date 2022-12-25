@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Test sheet reading"""
-from sheetreader.logbook import Entry, MarkdownDecorator
+import pytest
+
+from sheetreader.logbook import Entry, MarkdownEntry
 
 
 def test_entries_sheet_has_expected_columns(logbook):
@@ -39,11 +41,19 @@ def test_entries_sheet_has_expected_columns(logbook):
         assert c in logbook.header
 
 
+# Method is only used to verify the actual Spreadsheet contents
+@pytest.mark.skip()
 def test_sheet_has_correct_values(logbook):
+    non_empty = ['country','place','overnight']
+    non_empty_cycling_day = ['distance','start','end']
+
     for e in logbook.entries:
         assert isinstance(e, Entry)
+        for f in non_empty:
+            assert getattr(e, f) != ''
         if e.is_cycling_day:
-            assert e.distance > 0
+            for f in non_empty_cycling_day:
+                assert getattr(e, f) != ''
         else:
             assert e.distance is None
 
@@ -51,7 +61,7 @@ def test_sheet_has_correct_values(logbook):
 def test_current_entry_markdown(logbook, example_entry_markdown):
     entry = logbook.entry(example_entry_markdown["iso_date"])
     assert (
-        MarkdownDecorator(entry, template_file="entry_v2.md").get_markdown()
+        MarkdownEntry(entry, template_file="entry_v2.md").content
         == example_entry_markdown["markdown"]
     )
 

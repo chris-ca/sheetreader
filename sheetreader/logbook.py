@@ -204,8 +204,13 @@ class Entry:
     def is_rest_day(self):
         return self.distance is None
 
+class EntryDecorator(ABC):
+    @property
+    @abstractmethod
+    def content(self):
+        pass
 
-class MarkdownDecorator:
+class MarkdownEntry(EntryDecorator):
     """Turn Logbook Entry into Markdown."""
 
     def __init__(self, entry: Entry, template_file="entry_v2.md"):
@@ -215,11 +220,12 @@ class MarkdownDecorator:
         self.entry = entry
 
     def __repr__(self):
-        return self.get_markdown()
+        return self.__name__+self.day
 
     @property
-    def text(self):
-        return self.get_markdown().lstrip() + "\n"
-
-    def get_markdown(self):
+    def content(self):
         return self.template.render(e=self.entry)
+    # @property
+    # def text(self):
+    #     return self.get().lstrip() + "\n"
+
